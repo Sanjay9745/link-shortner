@@ -203,41 +203,7 @@ app.get('/link/:shortCode', async (req, res) => {
       <meta property="og:url" content="${link.originalUrl}" />
       <meta property="og:type" content="website" />
       <meta http-equiv="refresh" content="0;url=/loc/${shortCode}">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-          text-align: center;
-        }
-        .preview {
-          max-width: 600px;
-          margin: 20px auto;
-          padding: 20px;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-        }
-        .preview img {
-          max-width: 100%;
-          height: auto;
-          margin: 10px 0;
-          border-radius: 4px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="preview">
-        <h1>${link.ogTitle || 'Redirecting...'}</h1>
-        ${link.ogDescription ? `<p>${link.ogDescription}</p>` : ''}
-        ${ogImageUrl ? `<img src="${ogImageUrl}" alt="${link.ogTitle || 'Preview'}" />` : ''}
-        <p>Redirecting to ${link.originalUrl}...</p>
-      </div>
-    </body>
+      <script>window.location.href = '/loc/${shortCode}';</script>
     </html>
   `);
 });
