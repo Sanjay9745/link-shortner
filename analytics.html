@@ -98,6 +98,7 @@
           <th>Timestamp</th>
           <th>Geo Details</th>
           <th>Exactlocation</th>
+          <th>Map</th>
         </tr>
       </thead>
       <tbody id="clicksTable">
@@ -153,6 +154,9 @@
                   .replace(/[\{\}\"]/g, '')
                   .replace(/,/g, '<br>')
                 }</td>
+                <td>
+                <a href="https://www.google.com/maps/search/?api=1&query=${click?.exactLocation?.latitude},${click?.exactLocation?.longitude}" target="_blank">View on Map</a>
+                </td>
             `;
             clicksTable.appendChild(row);
           });

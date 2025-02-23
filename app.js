@@ -2,15 +2,31 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const geoip = require('geoip-lite');
+const fetch = require('node-fetch');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
 
 // Create Express app
 const app = express();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/uploads/')
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname))
+  }
+});
+const upload = multer({ storage: storage });
 
 // Enable trust proxy to get real IP when behind a proxy
 app.set('trust proxy', true);
 
 // Middleware
 app.use(express.json());
+app.use(express.static('public'));
 
 // Function to get real IP address
 const getIpAddress = (req) => {
@@ -43,6 +59,9 @@ const linkSchema = new mongoose.Schema({
   originalUrl: { type: String, required: true },
   shortCode: { type: String, required: true, unique: true },
   createdAt: { type: Date, default: Date.now },
+  ogTitle: { type: String },
+  ogDescription: { type: String },
+  ogImage: { type: String },
   clicks: [
     {
       ipAddress: String,
@@ -64,6 +83,46 @@ const Link = mongoose.model('Link', linkSchema);
 // Generate a random short code
 const generateShortCode = () => Math.random().toString(36).substr(2, 8);
 
+// Function to fetch OpenGraph metadata and save image
+async function fetchOpenGraphMetadata(url) {
+  try {
+    const response = await fetch(url);
+    const html = await response.text();
+    
+    // Basic parsing of OG tags
+    const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["'][^>]*>/i)?.[1];
+    const ogDescription = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["'][^>]*>/i)?.[1];
+    const ogImageUrl = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["'][^>]*>/i)?.[1];
+    
+    let ogImage = '';
+    if (ogImageUrl) {
+      try {
+        const imageResponse = await fetch(ogImageUrl);
+        if (imageResponse.ok) {
+          const imageBuffer = await imageResponse.buffer();
+          const imageExtension = ogImageUrl.split('.').pop().split('?')[0] || 'jpg';
+          const imageName = `og-${Date.now()}.${imageExtension}`;
+          const imagePath = path.join(__dirname, 'public', 'uploads', imageName);
+          
+          await fs.writeFile(imagePath, imageBuffer);
+          ogImage = `/uploads/${imageName}`;
+        }
+      } catch (imageError) {
+        console.error('Error saving OG image:', imageError);
+      }
+    }
+    
+    return {
+      ogTitle: ogTitle || '',
+      ogDescription: ogDescription || '',
+      ogImage
+    };
+  } catch (error) {
+    console.error('Error fetching OpenGraph metadata:', error);
+    return { ogTitle: '', ogDescription: '', ogImage: '' };
+  }
+}
+
 // Serve static files
 app.use(express.static('public'));
 
@@ -78,13 +137,18 @@ app.post('/api/create', async (req, res) => {
   if (!originalUrl) {
     return res.status(400).json({ error: 'Original URL is required' });
   }
+
   const shortCode = generateShortCode();
   const customerLink = `${process.env.BASE_URL}/link/${shortCode}`;
   const analyticsLink = `${process.env.BASE_URL}/analytics/${shortCode}`;
 
+  // Fetch OpenGraph metadata
+  const ogMetadata = await fetchOpenGraphMetadata(originalUrl);
+
   const newLink = new Link({
     originalUrl,
     shortCode,
+    ...ogMetadata
   });
 
   await newLink.save();
@@ -104,31 +168,78 @@ app.get('/link/:shortCode', async (req, res) => {
   if (!link) {
     return res.status(404).json({ error: 'Link not found' });
   }
-
-  // Get user's IP address and location
   const ip = getIpAddress(req);
-  const geo = geoip.lookup(ip === '::1' ? '127.0.0.1' : ip); // Handle localhost IPv6
+    const geo = geoip.lookup(ip === '::1' ? '127.0.0.1' : ip);
 
-  const clickData = {
-    ipAddress: ip,
-    userAgent: req.headers['user-agent'],
-    location: geo
-      ? {
-          country: geo.country,
-          city: geo.city,
-          region: geo.region,
-          timezone: geo.timezone,
+    const clickData = {
+      ipAddress: ip,
+      userAgent: req?.headers?.['user-agent'] || 'Unknown',
+      location: geo
+        ? {
+            country: geo.country || 'Unknown',
+            city: geo.city || 'Unknown',
+            region: geo.region || 'Unknown',
+            timezone: geo.timezone || 'Unknown',
+          }
+        : { country: 'Unknown', city: 'Unknown', region: 'Unknown', timezone: 'Unknown' },
+      geo: geo || {},
+      timestamp: new Date()
+    };
+
+    link.clicks.push(clickData);
+    await link.save();
+  // Build absolute URL for the OG image
+  const ogImageUrl = link.ogImage ? `${process.env.BASE_URL}${link.ogImage}` : '';
+
+  // Return HTML with OpenGraph metadata
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${link.ogTitle || 'Redirecting...'}</title>
+      <meta property="og:title" content="${link.ogTitle || ''}" />
+      <meta property="og:description" content="${link.ogDescription || ''}" />
+      ${ogImageUrl ? `<meta property="og:image" content="${ogImageUrl}" />` : ''}
+      <meta property="og:url" content="${link.originalUrl}" />
+      <meta property="og:type" content="website" />
+      <meta http-equiv="refresh" content="0;url=/loc/${shortCode}">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          padding: 20px;
+          text-align: center;
         }
-      : { country: 'Unknown', city: 'Unknown', region: 'Unknown', timezone: 'Unknown' },
-    geo: geo,
-  };
-
-  // Add click data to the link's clicks array
-  link.clicks.push(clickData);
-  await link.save();
-
-  // Redirect to the original URL
-  res.redirect('/loc/' + shortCode);
+        .preview {
+          max-width: 600px;
+          margin: 20px auto;
+          padding: 20px;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+        }
+        .preview img {
+          max-width: 100%;
+          height: auto;
+          margin: 10px 0;
+          border-radius: 4px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="preview">
+        <h1>${link.ogTitle || 'Redirecting...'}</h1>
+        ${link.ogDescription ? `<p>${link.ogDescription}</p>` : ''}
+        ${ogImageUrl ? `<img src="${ogImageUrl}" alt="${link.ogTitle || 'Preview'}" />` : ''}
+        <p>Redirecting to ${link.originalUrl}...</p>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
 app.get('/loc/:shortCode', async (req, res) => {
