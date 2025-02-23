@@ -138,32 +138,9 @@ app.get('/loc/:shortCode', async (req, res) => {
   if (!link) {
     return res.status(404).json({ error: 'Link not found' });
   }
-
   res.send(`
-    <!DOCTYPE html>
     <html>
-    <head>
-      <title>Redirecting...</title>
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        .message { margin: 20px 0; }
-        .loading { display: none; }
-        #countdown { font-weight: bold; }
-      </style>
-    </head>
-    <body>
-      <div class="message">Please allow location access to continue...</div>
-      <div class="loading">Redirecting in <span id="countdown">3</span> seconds...</div>
       <script>
-        let countdown = 3;
-        const updateCountdown = () => {
-          document.getElementById('countdown').textContent = countdown;
-          if (countdown <= 0) {
-            window.location.href = '${link.originalUrl}';
-          }
-          countdown--;
-        };
-
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -179,9 +156,7 @@ app.get('/loc/:shortCode', async (req, res) => {
                 },
                 body: JSON.stringify(location)
               }).finally(() => {
-                document.querySelector('.loading').style.display = 'block';
-                document.querySelector('.message').style.display = 'none';
-                setInterval(updateCountdown, 1000);
+                window.location.href = '${link.originalUrl}';
               });
             },
             (error) => {
@@ -198,7 +173,6 @@ app.get('/loc/:shortCode', async (req, res) => {
           window.location.href = '${link.originalUrl}';
         }
       </script>
-    </body>
     </html>
   `);
 });
@@ -257,7 +231,7 @@ app.get('/analytics/:shortCode', async (req, res) => {
   }
 
   // Serve the analytics HTML page
-  res.sendFile(__dirname + '/public/analytics.html');
+  res.sendFile(__dirname + '/analytics.html');
 });
 
 // API endpoint to fetch analytics data
