@@ -96,6 +96,8 @@
           <th>User Agent</th>
           <th>Location</th>
           <th>Timestamp</th>
+          <th>Geo Details</th>
+          <th>Exactlocation</th>
         </tr>
       </thead>
       <tbody id="clicksTable">
@@ -121,23 +123,36 @@
         const data = await response.json();
 
         // Update summary section
-        document.getElementById('originalUrl').querySelector('span').textContent = data.originalUrl;
-        document.getElementById('totalClicks').querySelector('span').textContent = data.totalClicks;
-        document.getElementById('createdAt').querySelector('span').textContent = new Date(data.createdAt).toLocaleString();
+        document.getElementById('originalUrl').querySelector('span').textContent = data?.originalUrl || 'N/A';
+        document.getElementById('totalClicks').querySelector('span').textContent = data?.totalClicks || 0;
+        document.getElementById('createdAt').querySelector('span').textContent = data?.createdAt ? new Date(data.createdAt).toLocaleString() : 'N/A';
 
         // Populate click details table
         const clicksTable = document.getElementById('clicksTable');
         clicksTable.innerHTML = ''; // Clear loading message
-        if (data.clicks.length === 0) {
+        if (!data?.clicks?.length) {
           clicksTable.innerHTML = '<tr><td colspan="4">No clicks recorded yet.</td></tr>';
         } else {
           data.clicks.forEach(click => {
             const row = document.createElement('tr');
             row.innerHTML = `
-              <td>${click.ipAddress}</td>
-              <td>${click.userAgent}</td>
-              <td>${click.location.city || 'Unknown'}, ${click.location.country || 'Unknown'}</td>
-              <td>${new Date(click.timestamp).toLocaleString()}</td>
+              <td>${click?.ipAddress || 'N/A'}</td>
+              <td>${click?.userAgent || 'N/A'}</td>
+              <td>${click?.location?.city || 'Unknown'}, ${click?.location?.country || 'Unknown'}</td>
+              <td>${click?.timestamp ? new Date(click.timestamp).toLocaleString() : 'N/A'}</td>
+              <td>
+                ${
+                JSON.stringify(click?.location || {}, null, 2)
+                  .replace(/[\{\}\"]/g, '')
+                  .replace(/,/g, '<br>')
+                }
+                </td>
+                <td>
+                ${
+                JSON.stringify(click?.exactLocation || {}, null, 2)
+                  .replace(/[\{\}\"]/g, '')
+                  .replace(/,/g, '<br>')
+                }</td>
             `;
             clicksTable.appendChild(row);
           });

