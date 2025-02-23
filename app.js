@@ -193,6 +193,20 @@ app.post('/api/location/:shortCode', async (req, res) => {
     }
 
     const location = { latitude, longitude };
+    // Get reverse geocoding data from OpenStreetMap
+    const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+    try {
+      const response = await fetch(reverseGeoUrl, {
+        headers: {
+          'User-Agent': 'LinkShortener/1.0' // Required by Nominatim terms of use
+        }
+      });
+      const geoData = await response.json();
+      location.address = geoData.address;
+      location.displayName = geoData.display_name;
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+    }
     const ip = getIpAddress(req);
     const geo = geoip.lookup(ip === '::1' ? '127.0.0.1' : ip);
 
