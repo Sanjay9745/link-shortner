@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const geoip = require('geoip-lite');
-const fetch = require('node-fetch');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
