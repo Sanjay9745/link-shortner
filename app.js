@@ -6,8 +6,22 @@ const geoip = require('geoip-lite');
 // Create Express app
 const app = express();
 
+// Enable trust proxy to get real IP when behind a proxy
+app.set('trust proxy', true);
+
 // Middleware
 app.use(express.json());
+
+// Function to get real IP address
+const getIpAddress = (req) => {
+  // Try getting IP from various headers and fallback mechanisms
+  return req.headers['x-forwarded-for']?.split(',')[0]
+    || req.headers['x-real-ip']
+    || req.connection.remoteAddress
+    || req.socket.remoteAddress
+    || req.ip
+    || '127.0.0.1';
+};
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -90,8 +104,8 @@ app.get('/link/:shortCode', async (req, res) => {
   }
 
   // Get user's IP address and location
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  const geo = geoip.lookup(ip);
+  const ip = getIpAddress(req);
+  const geo = geoip.lookup(ip === '::1' ? '127.0.0.1' : ip); // Handle localhost IPv6
 
   const clickData = {
     ipAddress: ip,
