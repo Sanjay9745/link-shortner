@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Link Shortener</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    input[type="text"] {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .result {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .result a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .result a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Link Shortener</h1>
+    <form id="linkForm">
+      <input type="text" id="originalUrl" placeholder="Enter your long URL here" required />
+      <button type="submit">Shorten Link</button>
+    </form>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    document.getElementById('linkForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const originalUrl = document.getElementById('originalUrl').value;
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>Loading...</p>';
+
+      try {
+        // Send POST request to the backend API
+        const response = await fetch('/api/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ originalUrl }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to shorten the link');
+        }
+
+        const data = await response.json();
+
+        // Display the generated links
+        resultDiv.innerHTML = `
+          <p><strong>Customer Link:</strong> <a href="${data.customerLink}" target="_blank">${data.customerLink}</a></p>
+          <p><strong>Analytics Link:</strong> <a href="${data.analyticsLink}" target="_blank">${data.analyticsLink}</a></p>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>

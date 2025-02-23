@@ -38,7 +38,12 @@ const Link = mongoose.model('Link', linkSchema);
 
 // Generate a random short code
 const generateShortCode = () => Math.random().toString(36).substr(2, 8);
+app.use(express.static('public'));
 
+// Serve the HTML file at the root route
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 // Route to create a new short link
 app.post('/api/create', async (req, res) => {
   const { originalUrl } = req.body;
