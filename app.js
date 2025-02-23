@@ -53,6 +53,7 @@ const linkSchema = new mongoose.Schema({
         region: String,
         timezone: String,
       },
+      geo: Object, 
       timestamp: { type: Date, default: Date.now },
     },
   ],
@@ -118,6 +119,7 @@ app.get('/link/:shortCode', async (req, res) => {
           timezone: geo.timezone,
         }
       : { country: 'Unknown', city: 'Unknown', region: 'Unknown', timezone: 'Unknown' },
+    geo: geo
   };
 
   // Add click data to the link's clicks array
