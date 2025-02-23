@@ -68,7 +68,7 @@ app.use(express.static('public'));
 
 // Serve the HTML file at the root route
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html');
+  res.sendFile(__dirname + '/index.html');
 });
 
 // Route to create a new short link
