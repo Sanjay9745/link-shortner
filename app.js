@@ -28,7 +28,7 @@ const connectDB = async () => {
   try {
     await mongoose.connect(`${process.env.MONGO_URI}`, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
     });
     console.log('Connected to MongoDB');
   } catch (err) {
@@ -53,30 +53,30 @@ const linkSchema = new mongoose.Schema({
         region: String,
         timezone: String,
       },
-      geo: Object, 
+      geo: Object,
       timestamp: { type: Date, default: Date.now },
     },
   ],
 });
-
 const Link = mongoose.model('Link', linkSchema);
 
 // Generate a random short code
 const generateShortCode = () => Math.random().toString(36).substr(2, 8);
+
+// Serve static files
 app.use(express.static('public'));
 
 // Serve the HTML file at the root route
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+  res.sendFile(__dirname + '/public/index.html');
 });
+
 // Route to create a new short link
 app.post('/api/create', async (req, res) => {
   const { originalUrl } = req.body;
-
   if (!originalUrl) {
     return res.status(400).json({ error: 'Original URL is required' });
   }
-
   const shortCode = generateShortCode();
   const customerLink = `${process.env.BASE_URL}/link/${shortCode}`;
   const analyticsLink = `${process.env.BASE_URL}/analytics/${shortCode}`;
@@ -119,7 +119,7 @@ app.get('/link/:shortCode', async (req, res) => {
           timezone: geo.timezone,
         }
       : { country: 'Unknown', city: 'Unknown', region: 'Unknown', timezone: 'Unknown' },
-    geo: geo
+    geo: geo,
   };
 
   // Add click data to the link's clicks array
@@ -132,6 +132,19 @@ app.get('/link/:shortCode', async (req, res) => {
 
 // Route to view analytics for a specific short link
 app.get('/analytics/:shortCode', async (req, res) => {
+  const { shortCode } = req.params;
+  const link = await Link.findOne({ shortCode });
+
+  if (!link) {
+    return res.status(404).send('<h1>Link not found</h1>');
+  }
+
+  // Serve the analytics HTML page
+  res.sendFile(__dirname + '/public/analytics.html');
+});
+
+// API endpoint to fetch analytics data
+app.get('/api/analytics/:shortCode', async (req, res) => {
   const { shortCode } = req.params;
   const link = await Link.findOne({ shortCode });
 

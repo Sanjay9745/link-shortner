@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    header {
+      background-color: #007bff;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    h1, h2 {
+      margin: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .summary div {
+      background: #e9ecef;
+      padding: 15px;
+      border-radius: 5px;
+      flex: 1;
+      margin: 0 10px;
+      text-align: center;
+    }
+    .summary div strong {
+      font-size: 1.2em;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .loader {
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Analytics Dashboard</h1>
+  </header>
+  <main>
+    <div class="summary">
+      <div id="originalUrl">
+        <strong>Original URL</strong>
+        <span>Loading...</span>
+      </div>
+      <div id="totalClicks">
+        <strong>Total Clicks</strong>
+        <span>Loading...</span>
+      </div>
+      <div id="createdAt">
+        <strong>Created At</strong>
+        <span>Loading...</span>
+      </div>
+    </div>
+    <h2>Click Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>IP Address</th>
+          <th>User Agent</th>
+          <th>Location</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="clicksTable">
+        <tr>
+          <td colspan="4" class="loader">Loading data...</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+    // Extract shortCode from the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const shortCode = window.location.pathname.split('/').pop();
+
+    // Fetch analytics data from the API
+    async function fetchAnalytics() {
+      try {
+        const response = await fetch(`/api/analytics/${shortCode}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch analytics data');
+        }
+        const data = await response.json();
+
+        // Update summary section
+        document.getElementById('originalUrl').querySelector('span').textContent = data.originalUrl;
+        document.getElementById('totalClicks').querySelector('span').textContent = data.totalClicks;
+        document.getElementById('createdAt').querySelector('span').textContent = new Date(data.createdAt).toLocaleString();
+
+        // Populate click details table
+        const clicksTable = document.getElementById('clicksTable');
+        clicksTable.innerHTML = ''; // Clear loading message
+        if (data.clicks.length === 0) {
+          clicksTable.innerHTML = '<tr><td colspan="4">No clicks recorded yet.</td></tr>';
+        } else {
+          data.clicks.forEach(click => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${click.ipAddress}</td>
+              <td>${click.userAgent}</td>
+              <td>${click.location.city || 'Unknown'}, ${click.location.country || 'Unknown'}</td>
+              <td>${new Date(click.timestamp).toLocaleString()}</td>
+            `;
+            clicksTable.appendChild(row);
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        document.getElementById('clicksTable').innerHTML = `<tr><td colspan="4">Error loading data: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Load analytics data on page load
+    fetchAnalytics();
+  </script>
+</body>
+</html>
